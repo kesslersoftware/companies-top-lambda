@@ -1,40 +1,95 @@
 package com.boycottpro.companies;
 
 import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.ScanRequest;
-import software.amazon.awssdk.services.dynamodb.model.ScanResponse;
+import software.amazon.awssdk.services.dynamodb.model.*;
+import com.boycottpro.models.CompanySubset;
+import com.boycottpro.utilities.CompanyUtility;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class GetTopCompaniesHandlerTest {
 
-    private static final String TABLE_NAME = "";
+    @Mock
+    private DynamoDbClient dynamoDb;
 
     @Mock
-    private DynamoDbClient dynamoDbMock;
+    private Context context;
 
-
+    @InjectMocks
     private GetTopCompaniesHandler handler;
 
     @Test
-    public void handleRequest() throws Exception {
+    public void testHandleRequestReturnsTopCompanies() throws Exception {
+        // Given
+        int limit = 2;
+        Map<String, String> pathParams = Map.of("limit", String.valueOf(limit));
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent().withPathParameters(pathParams);
 
+        Map<String, AttributeValue> company1 = Map.of(
+                "company_id", AttributeValue.fromS("c1"),
+                "company_name", AttributeValue.fromS("Apple"),
+                "boycott_count", AttributeValue.fromN("25")
+        );
+        Map<String, AttributeValue> company2 = Map.of(
+                "company_id", AttributeValue.fromS("c2"),
+                "company_name", AttributeValue.fromS("Amazon"),
+                "boycott_count", AttributeValue.fromN("15")
+        );
+
+        when(dynamoDb.scan(argThat((ScanRequest r) ->
+                r != null && "companies".equals(r.tableName())
+        ))).thenReturn(ScanResponse.builder().items(List.of(company1, company2)).build());
+
+        // When
+        APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
+
+        // Then
+        assertEquals(200, response.getStatusCode());
+        assertTrue(response.getBody().contains("Apple"));
+        assertTrue(response.getBody().contains("Amazon"));
+        assertTrue(response.getBody().contains("25"));
+        assertTrue(response.getBody().contains("15"));
     }
 
+    @Test
+    public void testHandleRequestReturns400ForMissingLimit() {
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent()
+                .withPathParameters(Map.of("limit", "0"));
+
+        APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
+
+        assertEquals(400, response.getStatusCode());
+        assertTrue(response.getBody().contains("Missing limit"));
+    }
+
+    @Test
+    public void testHandleRequestReturns500OnException() {
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent()
+                .withPathParameters(Map.of("limit", "5"));
+
+        when(dynamoDb.scan(any(ScanRequest.class)))
+                .thenThrow(RuntimeException.class);
+
+        APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
+
+        assertEquals(500, response.getStatusCode());
+        assertTrue(response.getBody().contains("Unexpected server error"));
+    }
 }
+
