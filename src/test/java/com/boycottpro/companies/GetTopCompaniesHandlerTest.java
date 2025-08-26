@@ -15,6 +15,7 @@ import software.amazon.awssdk.services.dynamodb.model.*;
 import com.boycottpro.models.CompanySubset;
 import com.boycottpro.utilities.CompanyUtility;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -39,8 +40,17 @@ public class GetTopCompaniesHandlerTest {
         // Given
         int limit = 2;
         Map<String, String> pathParams = Map.of("limit", String.valueOf(limit));
-        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent().withPathParameters(pathParams);
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
+        Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
+        Map<String, Object> authorizer = new HashMap<>();
+        authorizer.put("claims", claims);
 
+        APIGatewayProxyRequestEvent.ProxyRequestContext rc = new APIGatewayProxyRequestEvent.ProxyRequestContext();
+        rc.setAuthorizer(authorizer);
+        event.setRequestContext(rc);
+
+        // Path param "s" since client calls /users/s
+        event.setPathParameters(pathParams);
         Map<String, AttributeValue> company1 = Map.of(
                 "company_id", AttributeValue.fromS("c1"),
                 "company_name", AttributeValue.fromS("Apple"),
@@ -69,8 +79,19 @@ public class GetTopCompaniesHandlerTest {
 
     @Test
     public void testHandleRequestReturns400ForMissingLimit() {
-        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent()
-                .withPathParameters(Map.of("limit", "0"));
+        int limit = 0;
+        Map<String, String> pathParams = Map.of("limit", String.valueOf(limit));
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
+        Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
+        Map<String, Object> authorizer = new HashMap<>();
+        authorizer.put("claims", claims);
+
+        APIGatewayProxyRequestEvent.ProxyRequestContext rc = new APIGatewayProxyRequestEvent.ProxyRequestContext();
+        rc.setAuthorizer(authorizer);
+        event.setRequestContext(rc);
+
+        // Path param "s" since client calls /users/s
+        event.setPathParameters(pathParams);
 
         APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
 
@@ -79,9 +100,20 @@ public class GetTopCompaniesHandlerTest {
     }
 
     @Test
-    public void testHandleRequestReturns500OnException() {
-        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent()
-                .withPathParameters(Map.of("limit", "5"));
+    public void testHandleRequestReturns500Exception() {
+        int limit = 5;
+        Map<String, String> pathParams = Map.of("limit", String.valueOf(limit));
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
+        Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
+        Map<String, Object> authorizer = new HashMap<>();
+        authorizer.put("claims", claims);
+
+        APIGatewayProxyRequestEvent.ProxyRequestContext rc = new APIGatewayProxyRequestEvent.ProxyRequestContext();
+        rc.setAuthorizer(authorizer);
+        event.setRequestContext(rc);
+
+        // Path param "s" since client calls /users/s
+        event.setPathParameters(pathParams);
 
         when(dynamoDb.scan(any(ScanRequest.class)))
                 .thenThrow(RuntimeException.class);
