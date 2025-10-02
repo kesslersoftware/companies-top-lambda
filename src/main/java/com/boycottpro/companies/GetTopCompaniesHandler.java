@@ -9,6 +9,7 @@ import com.boycottpro.models.Companies;
 import com.boycottpro.models.CompanySubset;
 import com.boycottpro.utilities.CompanyUtility;
 import com.boycottpro.utilities.JwtUtility;
+import com.boycottpro.utilities.Logger;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -40,24 +41,26 @@ public class GetTopCompaniesHandler implements RequestHandler<APIGatewayProxyReq
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
         String sub = null;
+        int lineNum = 44;
         try {
             sub = JwtUtility.getSubFromRestEvent(event);
-            if (sub == null) return response(401,
-                    Map.of("message", "Unauthorized"));
-            LocalDateTime start = LocalDateTime.now();
+            if (sub == null) {
+            Logger.error(48, sub, "user is Unauthorized");
+            return response(401, Map.of("message", "Unauthorized"));
+        }
+            lineNum = 51;
             Map<String, String> pathParams = event.getPathParameters();
             int limit =  Integer.parseInt(pathParams.get("limit"));
             if (limit < 1 ) {
+                Logger.error(56, sub, "no limit");
                 return response(400,Map.of("error", "Missing limit in path"));
             }
-
+            lineNum = 58;
             List<CompanySubset> companies = getTopCompanies(limit);
-            LocalDateTime end = LocalDateTime.now();
-            Duration difference = Duration.between(start, end);
-            System.out.println("entire method took : " + difference.toMillis() + " milliseconds");
+            lineNum = 60;
             return response(200,companies);
         } catch (Exception e) {
-            System.out.println(e.getMessage() + " for user " + sub);
+            Logger.error(lineNum, sub, e.getMessage());
             return response(500,Map.of("error", "Unexpected server error: " + e.getMessage()));
         }
     }
@@ -84,7 +87,6 @@ public class GetTopCompaniesHandler implements RequestHandler<APIGatewayProxyReq
         ScanResponse response = dynamoDb.scan(scan);
         LocalDateTime end = LocalDateTime.now();
         Duration difference = Duration.between(start, end);
-        System.out.println("It took : " + difference.toMillis() + " milliseconds to retrieve records from the database");
         AtomicInteger rankCounter = new AtomicInteger(1);
         start = LocalDateTime.now();
         List<CompanySubset> companies =  response.items().stream()
@@ -101,7 +103,6 @@ public class GetTopCompaniesHandler implements RequestHandler<APIGatewayProxyReq
                 .collect(Collectors.toList());
         end = LocalDateTime.now();
         difference = Duration.between(start, end);
-        System.out.println("It took : " + difference.toMillis() + " milliseconds to sort and limit the results");
         return companies;
     }
 
